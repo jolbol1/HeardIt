@@ -1,0 +1,70 @@
+@page "/reddit"
+@using HeardIt.Models
+
+@inject IHttpClientFactory _clientFactory
+
+<h3>Subreddit Data</h3>
+
+@if (string.IsNullOrWhiteSpace(errorString) == false)
+{
+    <h2 class="text-danger">@errorString</h2>
+}
+else if (subReddit is null)
+{
+    <h4 class="text-info">Loading...</h4>
+}
+else
+{
+    <table class="table table-striped table-responsive">
+        <thead>
+        <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Self</th>
+            <th>Id</th>
+            <th>Kind</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var post in subReddit.Data.Children)
+        {
+            <tr>
+                <td>@post.Data.Title</td>
+                <td>@post.Data.Author</td>
+                <td>@post.Data.Selftext</td>
+                <td>@post.Data.Id</td>
+                <td>@post.Kind</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    SubRedditModel subReddit;
+    string errorString;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get,
+            "https://www.reddit.com/r/AskReddit.json");
+
+        var client = _clientFactory.CreateClient();
+
+        HttpResponseMessage responseMessage = await client.SendAsync(request);
+
+        if (responseMessage.IsSuccessStatusCode)
+        {
+            var jsonString = await responseMessage.Content.ReadAsStringAsync();
+            subReddit = SubRedditModel.FromJson(jsonString);
+            errorString = null;
+        }
+        else
+        {
+            errorString = $"Error Fetching SubReddit Data : {responseMessage.ReasonPhrase}";
+        }
+    }
+
+
+}
