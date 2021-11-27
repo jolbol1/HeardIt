@@ -3,9 +3,9 @@
 
 @inject IHttpClientFactory _clientFactory
 
-<h3>Subreddit Data</h3>
+<input class="form-control mb-3" @onchange="onSubredditChange" value="@subredditInput"/>
 
-@if (string.IsNullOrWhiteSpace(errorString) == false)
+@if (string.IsNullOrWhiteSpace(errorString) == false || postCount == -1)
 {
     <h2 class="text-danger">@errorString</h2>
 }
@@ -15,55 +15,107 @@ else if (subReddit is null)
 }
 else
 {
-    <table class="table table-striped table-responsive">
-        <thead>
-        <tr>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Self</th>
-            <th>Id</th>
-            <th>Kind</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var post in subReddit.Data.Children)
-        {
-            <tr>
-                <td>@post.Data.Title</td>
-                <td>@post.Data.Author</td>
-                <td>@post.Data.Selftext</td>
-                <td>@post.Data.Id</td>
-                <td>@post.Kind</td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    var post = subReddit.Data.Children[postNumber];
+    if (postNumber == postCount)
+    {
+        after = post.Kind + "_" + post.Data.Id;
+    }
+    <div class="card text-center">
+        <div class="card-header">
+            @post.Data.Subreddit
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">@post.Data.Title</h5>
+            <p class="card-text">@post.Data.Selftext</p>
+            <a href="@post.Data.Url" class="btn btn-outline-secondary">Reddit Link</a>
+        </div>
+        <div class="card-footer text-muted">
+            @{
+                long utcDate = post.Data.CreatedUtc;
+                DateTime start = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                DateTime date = start.AddSeconds(utcDate).ToLocalTime();
+            }
+            @date.ToString("yyyy-MM-dd")
+        </div>
+    </div>
+    <button class="btn btn-success mt-3" @onclick="incrementPost" disabled=@loadingPosts>
+        <span class="oi oi-arrow-right" aria-hidden="true"></span> Next Post
+    </button>
+    
+    <CommentsDisplay PostUrl="@post.Data.Url.ToString()" />
+
 }
+
+
 
 @code {
 
     SubRedditModel subReddit;
-    string errorString;
+    string? errorString;
+    int postNumber = 0;
+    string after;
+    int postCount;
+    bool loadingPosts = false;
+    string? subredditInput = "AskReddit";
 
     protected override async Task OnInitializedAsync()
     {
-        var request = new HttpRequestMessage(HttpMethod.Get,
-            "https://www.reddit.com/r/AskReddit.json");
+        await loadSubredditPosts();
+    }
 
+    public async Task loadSubredditPosts()
+    {
+        if (loadingPosts)
+        {
+            return;
+        }
+        loadingPosts = true;
+        postCount = 0;
+        postNumber = 0;
+        var url = $"https://www.reddit.com/r/{subredditInput}.json?after={after}";
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
         var client = _clientFactory.CreateClient();
 
         HttpResponseMessage responseMessage = await client.SendAsync(request);
+        loadingPosts = false;
 
         if (responseMessage.IsSuccessStatusCode)
         {
             var jsonString = await responseMessage.Content.ReadAsStringAsync();
             subReddit = SubRedditModel.FromJson(jsonString);
-            errorString = null;
+            subReddit.Data.Children = subReddit.Data.Children.Where(post => post.Data.Stickied == false).ToArray();
+            postCount = subReddit.Data.Children.Length - 1;
+            if (postCount == -1)
+            {
+                errorString = "Subreddit is empty or contains no posts.";
+            }
+            else
+            {
+                errorString = null;
+            }
         }
         else
         {
             errorString = $"Error Fetching SubReddit Data : {responseMessage.ReasonPhrase}";
         }
+    }
+
+    public async Task onSubredditChange(ChangeEventArgs e)
+    {
+        subredditInput = e?.Value?.ToString();
+        after = null;
+        await loadSubredditPosts();
+    }
+
+    public async Task incrementPost()
+    {
+        if (postNumber >= postCount)
+        {
+            await loadSubredditPosts();
+            loadingPosts = false;
+        }
+        ++postNumber;
+
     }
 
 
