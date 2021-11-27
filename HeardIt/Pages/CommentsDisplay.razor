@@ -1,0 +1,101 @@
+@using HeardIt.Models
+@inject IHttpClientFactory _clientFactory
+
+
+<h3>Comments</h3>
+
+@if (loadingComments)
+{
+    <h4 class="text-info">Loading Comments...</h4>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th>Author</th>
+            <th>Comment</th>
+        </tr>
+        </thead>
+        <tbody>
+        @if (post != null && post[1] != null && post[1].Data.Children != null && post[1].Data.Children.Length > 0)
+        {
+            foreach (var comment in post[1].Data.Children)
+            {
+                <tr>
+                    <td>
+                        @comment.Data.Author
+                    </td>
+                    <td>
+                        @comment.Data.Body
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    [Parameter]
+    public string PostUrl { get; set; }
+
+    bool loadingComments = false;
+    int commentCount = 0;
+    int commentNumber = 0;
+    PostModel[] post;
+    string errorString;
+    private string _value;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        _value = PostUrl;
+        await loadPost();
+        
+    }
+
+    protected override async void OnParametersSet()
+    {
+        if (_value != PostUrl)
+        {
+            _value = PostUrl;
+            Console.WriteLine("a parameter has changed");
+            await loadPost();
+
+        }
+    }
+    
+    public async Task loadPost()
+    {
+        if (loadingComments)
+        {
+            return;
+        }
+        loadingComments = true;
+        commentCount = 0;
+        commentNumber = 0;
+        var url = $"{PostUrl}.json";
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var client = _clientFactory.CreateClient();
+
+        HttpResponseMessage responseMessage = await client.SendAsync(request);
+        loadingComments = false;
+
+        if (responseMessage.IsSuccessStatusCode)
+        {
+            var jsonString = await responseMessage.Content.ReadAsStringAsync();
+            post = PostModel.FromJson(jsonString);
+        }
+        else
+        {
+            errorString = $"Error Fetching SubReddit Data : {responseMessage.ReasonPhrase}";
+        }
+        StateHasChanged();
+
+    }
+
+
+
+}
