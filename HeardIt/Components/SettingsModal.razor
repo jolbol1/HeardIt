@@ -1,7 +1,6 @@
 @using HeardIt.Models
 @using Microsoft.Extensions.Logging
 @using HeardIt.Models
-@inject ILogger<SettingsModal> Logger
 
 <div id="modal-container">
     <EditForm EditContext="@_editContext" OnSubmit="@HandleSubmit">
@@ -97,15 +96,10 @@
 
     private async Task HandleSubmit()
     {
-        if (_editContext != null && _editContext.Validate())
+        if (_editContext.Validate())
         {
-            Logger.LogInformation("HandleSubmit called: Form is valid");
             await FormSubmitted.InvokeAsync(SettingsModel);
             await Task.CompletedTask;
-        }
-        else
-        {
-            Logger.LogInformation("HandleSubmit called: Form is INVALID");
         }
     }
 
