@@ -1,122 +1,189 @@
-@page "/reddit"
+@page "/red"
 @using HeardIt.Models
+@using HeardIt.Components
 
 @inject IHttpClientFactory _clientFactory
 
-<input class="form-control mb-3" @onchange="onSubredditChange" value="@subredditInput"/>
 
-@if (string.IsNullOrWhiteSpace(errorString) == false || postCount == -1)
+@if (SettingsDialogOpen)
 {
-    <h2 class="text-danger">@errorString</h2>
+    <SettingsModal OnClose="@OnSettingsDialogClose" FormSubmitted="@SettingsChanged" SettingsModel="@SettingsModel"></SettingsModal>
 }
-else if (subReddit is null)
-{
-    <h4 class="text-info">Loading...</h4>
-}
-else
-{
-    var post = subReddit.Data.Children[postNumber];
-    if (postNumber == postCount)
-    {
-        after = post.Kind + "_" + post.Data.Id;
-    }
-    <div class="card text-center">
-        <div class="card-header">
-            @post.Data.Subreddit
-        </div>
-        <div class="card-body">
-            <h5 class="card-title">@post.Data.Title</h5>
-            <p class="card-text">@post.Data.Selftext</p>
-            <a href="@post.Data.Url" class="btn btn-outline-secondary">Reddit Link</a>
-        </div>
-        <div class="card-footer text-muted">
-            @{
-                long utcDate = post.Data.CreatedUtc;
-                DateTime start = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                DateTime date = start.AddSeconds(utcDate).ToLocalTime();
-            }
-            @date.ToString("yyyy-MM-dd")
-        </div>
-    </div>
-    <button class="btn btn-success mt-3" @onclick="incrementPost" disabled=@loadingPosts>
-        <span class="oi oi-arrow-right" aria-hidden="true"></span> Next Post
+
+<div id="post-display" class="flex flex-row justify-center w-full content-center items-center">
+    <button class="text-gray-600" onclick="@DecrementPost">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
     </button>
-    
-    <CommentsDisplay PostUrl="@post.Data.Url.ToString()" />
+    <PostDisplay Post="@MainPost" OpenSettingsDialog="@OpenSettingsDialog" PostLoading="@PostLoading"></PostDisplay>
+    <button class="text-gray-600" onclick="@IncrementPost">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+    </button>
+</div>
 
-}
 
-
-
-@code {
-
-    SubRedditModel subReddit;
-    string? errorString;
-    int postNumber = 0;
-    string after;
-    int postCount;
-    bool loadingPosts = false;
-    string? subredditInput = "AskReddit";
-
-    protected override async Task OnInitializedAsync()
-    {
-        await loadSubredditPosts();
-    }
-
-    public async Task loadSubredditPosts()
-    {
-        if (loadingPosts)
+<div id="comment-display" class="flex flex-row justify-center w-full content-center items-center">
+    <div class="rounded mx-8 overflow-hidden border w-full lg:w-10/12 md:w-10/12 bg-gray-50 shadow-2xl">
+        <div class="w-full flex justify-between items-center p-3 bg-gray-500">
+            <span class="h-full font-bold text-lg text-white">Comments</span>
+        </div>
+        @if (Comments != null && !CommentsLoading)
         {
-            return;
-        }
-        loadingPosts = true;
-        postCount = 0;
-        postNumber = 0;
-        var url = $"https://www.reddit.com/r/{subredditInput}.json?after={after}";
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
-        var client = _clientFactory.CreateClient();
-
-        HttpResponseMessage responseMessage = await client.SendAsync(request);
-        loadingPosts = false;
-
-        if (responseMessage.IsSuccessStatusCode)
-        {
-            var jsonString = await responseMessage.Content.ReadAsStringAsync();
-            subReddit = SubRedditModel.FromJson(jsonString);
-            subReddit.Data.Children = subReddit.Data.Children.Where(post => post.Data.Stickied == false).ToArray();
-            postCount = subReddit.Data.Children.Length - 1;
-            if (postCount == -1)
+            foreach (var comment in Comments)
             {
-                errorString = "Subreddit is empty or contains no posts.";
-            }
-            else
-            {
-                errorString = null;
+                if (comment.Kind != "more")
+                {
+                    <CommentsDisplay CurrentComment="@comment" CommentsLoading="@CommentsLoading"/>
+                }
             }
         }
         else
         {
-            errorString = $"Error Fetching SubReddit Data : {responseMessage.ReasonPhrase}";
+            <div class="px-5 pb-2 shadow-inner">
+                <div class="pt-2">
+                    <div class="mb-2 my-2 text-sm text-gray-500 text-justify flex flex-col justify-center items-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
         }
-    }
+    </div>
+</div>
 
-    public async Task onSubredditChange(ChangeEventArgs e)
-    {
-        subredditInput = e?.Value?.ToString();
-        after = null;
-        await loadSubredditPosts();
-    }
 
-    public async Task incrementPost()
+@code {
+    private SettingsModel SettingsModel { get; set; } = new() {SubredditInput = "AskReddit"};
+    private Subreddit? SubReddit { get; set; }
+    private bool SettingsDialogOpen { get; set; }
+    //All Posts Loaded From Subreddit Page
+    private Posts[]? Posts { get; set; }
+    //Currently Displayed Post
+    private Post? MainPost { get; set; }
+    //All Comments for Current Post
+    private Post[]? Comments { get; set; }
+
+    private Post? CurrentComment { get; set; }
+
+    private int CurrentPostIndex { get; set; } = 0;
+    private int CurrentCommentIndex { get; set; } = 0;
+
+
+    private bool PostLoading { get; set; } = true;
+    private bool CommentsLoading { get; set; } = true;
+
+
+    private async void DecrementPost()
     {
-        if (postNumber >= postCount)
+        if (CurrentPostIndex == 0)
         {
-            await loadSubredditPosts();
-            loadingPosts = false;
+            return;
         }
-        ++postNumber;
-
+        if (Posts == null || Posts.Length == 0) return;
+        --CurrentPostIndex;
+        if (Posts[CurrentPostIndex] == null || Posts[CurrentPostIndex].Data == null || Posts[CurrentPostIndex].Data.Url == null) return;
+        await LoadPost(Posts[CurrentPostIndex].Data.Url);
     }
 
+    private async void IncrementPost()
+
+    {
+        if (CurrentPostIndex == Posts.Length - 1)
+        {
+            var after = MainPost.Kind + "_" + MainPost.Data.Id;
+            ++CurrentPostIndex;
+            await LoadSubredditPosts(after);
+            return;
+        }
+        if (Posts == null || Posts.Length == 0) return;
+        ++CurrentPostIndex;
+        if (Posts[CurrentPostIndex] == null || Posts[CurrentPostIndex].Data == null || Posts[CurrentPostIndex].Data.Url == null) return;
+        await LoadPost(Posts[CurrentPostIndex].Data.Url);
+    }
+
+    private async Task SettingsChanged(SettingsModel settings)
+    {
+        SettingsModel = settings;
+        SettingsDialogOpen = false;
+        await LoadSubredditPosts("", true);
+    }
+
+    private void OnSettingsDialogClose(bool accepted)
+    {
+        SettingsDialogOpen = false;
+    }
+
+    private void OpenSettingsDialog()
+    {
+        SettingsDialogOpen = true;
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubredditPosts();
+    }
+    private async Task LoadSubredditPosts(string after = "", bool newSub = false)
+    {
+        var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json?limit=5";
+        if (!string.IsNullOrEmpty(after))
+        {
+            url = url + $"&after={after}";
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var client = _clientFactory.CreateClient();
+
+        PostLoading = true;
+        CommentsLoading = true;
+        HttpResponseMessage responseMessage = await client.SendAsync(request);
+
+        if (responseMessage.IsSuccessStatusCode)
+        {
+            var jsonString = await responseMessage.Content.ReadAsStringAsync();
+            SubReddit = Subreddit.FromJson(jsonString);
+            if (newSub)
+            {
+                Posts = SubReddit.Data.Posts;
+                CurrentPostIndex = 0;
+            }
+            else
+            {
+                Posts = Posts != null ? Posts.Concat(SubReddit.Data.Posts).ToArray() : SubReddit.Data.Posts;
+            }
+            
+            await LoadPost(Posts[CurrentPostIndex].Data.Url);
+            PostLoading = false;
+            CommentsLoading = false;
+        }
+    }
+
+    private async Task LoadPost(Uri uri)
+    {
+        var url = uri.ToString() + ".json";
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var client = _clientFactory.CreateClient();
+
+        PostLoading = true;
+        CommentsLoading = true;
+        HttpResponseMessage responseMessage = await client.SendAsync(request);
+
+        if (responseMessage.IsSuccessStatusCode)
+        {
+            var jsonString = await responseMessage.Content.ReadAsStringAsync();
+            var postPages = PostPage.FromJson(jsonString);
+            MainPost = postPages[0].Data.Children[0];
+            Comments = postPages[1].Data.Children;
+            CurrentComment = Comments[0];
+            CurrentCommentIndex = 0;
+            PostLoading = false;
+            CommentsLoading = false;
+        }
+        StateHasChanged();
+    }
 
 }

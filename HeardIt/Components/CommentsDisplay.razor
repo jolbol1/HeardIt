@@ -1,0 +1,28 @@
+@using HeardIt.Models
+@inject IHttpClientFactory _clientFactory
+
+
+<div class="px-5 my-3  mx-5 pb-2 shadow bg-white">
+    <div class="pt-2">
+        <div class="mb-2 text-sm text-gray-500 text-justify flex flex-col justify-center">
+            <span class="h-full font-bold text-base text-black pb-1">
+                @CurrentComment.Data.Author
+            </span>
+            @CurrentComment.Data.Body
+        </div>
+    </div>
+</div>
+
+
+@code {
+
+    [Parameter]
+    public Post? CurrentComment { get; set; }
+
+    [Parameter]
+    public bool CommentsLoading { get; set; } = true;
+
+
+
+
+}
