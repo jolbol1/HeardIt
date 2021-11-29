@@ -1,8 +1,11 @@
 @page "/r"
+@page "/r/{*RedditRedirect}"
 @using HeardIt.Models
 @using HeardIt.Components
 
 @inject IHttpClientFactory _clientFactory
+@inject NavigationManager _navManager  
+
 
 
 @if (SettingsDialogOpen)
@@ -77,7 +80,10 @@
     private bool PostLoading { get; set; } = true;
     private bool CommentsLoading { get; set; } = true;
 
+    private string? QueryString { get; set; }
 
+    [Parameter]
+    public string? RedditRedirect { get; set; }
     private async void DecrementPost()
     {
         if (CurrentPostIndex == 0)
@@ -93,6 +99,11 @@
     private async void IncrementPost()
 
     {
+        if (Posts == null || Posts.Length == 0)
+        {
+            await LoadSubredditPosts("", true);
+            return;
+        }
         if (CurrentPostIndex == Posts.Length - 1)
         {
             var after = MainPost.Kind + "_" + MainPost.Data.Id;
@@ -100,7 +111,6 @@
             await LoadSubredditPosts(after);
             return;
         }
-        if (Posts == null || Posts.Length == 0) return;
         ++CurrentPostIndex;
         if (Posts[CurrentPostIndex] == null || Posts[CurrentPostIndex].Data == null || Posts[CurrentPostIndex].Data.Url == null) return;
         await LoadPost(Posts[CurrentPostIndex].Data.Url);
@@ -125,11 +135,28 @@
     
     protected override async Task OnInitializedAsync()
     {
-        await LoadSubredditPosts();
+        QueryString = _navManager.ToAbsoluteUri(_navManager.Uri).Query;
+        if (!string.IsNullOrEmpty(RedditRedirect))
+        {
+            if (RedditRedirect.Contains("/") && RedditRedirect.Split("/")[1] != null && RedditRedirect.Split("/")[1] == "comments")
+            {
+                SettingsModel.SubredditInput = RedditRedirect.Split("/")[0];
+                await LoadPost(_navManager.ToAbsoluteUri(_navManager.Uri));
+            }
+            else
+            {
+                SettingsModel.SubredditInput = RedditRedirect;
+                await LoadSubredditPosts();
+            }
+        }
+        else
+        {
+            await LoadSubredditPosts();
+        }
     }
     private async Task LoadSubredditPosts(string after = "", bool newSub = false)
     {
-        var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json?limit=5";
+        var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json{QueryString}";
         if (!string.IsNullOrEmpty(after))
         {
             url = url + $"&after={after}";
@@ -164,7 +191,7 @@
 
     private async Task LoadPost(Uri uri)
     {
-        var url = uri.ToString() + ".json";
+        var url = "https://reddit.com" + uri.AbsolutePath + ".json" + uri.Query;
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         var client = _clientFactory.CreateClient();
 
