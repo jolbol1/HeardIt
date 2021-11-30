@@ -37,8 +37,10 @@ namespace HeardIt.Models
     public partial class PostData
     {
 
-        [J("id")]                            public string Id { get; set; }
-        [J("url")]                     public Uri Url { get; set; }
+        [J("id")] public string Id { get; set; }
+        [J("url")] public Uri Url { get; set; }
+        [J("permalink", NullValueHandling = N.Ignore)] public string Permalink { get; set; }                   
+
     }
     
     public partial class PostPage

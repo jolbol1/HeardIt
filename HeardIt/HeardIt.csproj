@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="2.4.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
       <PackageReference Include="System.Net.Http.Json" Version="6.0.0" />
         <UpToDateCheckBuilt Include="Styles/app.css" Set="Css" />

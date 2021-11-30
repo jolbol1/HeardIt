@@ -13,14 +13,16 @@
       "dotnetRunMessages": true,
       "applicationUrl": "https://localhost:7084;http://localhost:5227",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/james/RiderProjects/HeardIt/HeardIt/googleservice.json"
       }
     },
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/james/RiderProjects/HeardIt/HeardIt/googleservice.json"
       }
     }
   }

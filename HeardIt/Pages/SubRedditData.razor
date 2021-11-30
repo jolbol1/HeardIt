@@ -2,9 +2,10 @@
 @page "/r/{*RedditRedirect}"
 @using HeardIt.Models
 @using HeardIt.Components
+@using Google.Cloud.TextToSpeech.V1
 
 @inject IHttpClientFactory _clientFactory
-@inject NavigationManager _navManager  
+@inject NavigationManager _navManager
 
 
 
@@ -19,7 +20,14 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
     </button>
+    
     <PostDisplay Post="@MainPost" OpenSettingsDialog="@OpenSettingsDialog" PostLoading="@PostLoading"></PostDisplay>
+    @if (!PostLoading && MainPost != null)
+    {
+        var readString = MainPost.Data.Title + "..." + MainPost.Data.Selftext;
+        <GoogleTest Client="@Client" VoiceSelectionParams="@VoiceSelectionParams" inputString="@readString"></GoogleTest>
+    }
+
     <button class="text-gray-600" onclick="@IncrementPost">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -33,13 +41,14 @@
         <div class="w-full flex justify-between items-center p-3 bg-gray-500">
             <span class="h-full font-bold text-lg text-white">Comments</span>
         </div>
-        @if (Comments != null && !CommentsLoading)
+        @if (!CommentsLoading && Comments != null)
         {
             foreach (var comment in Comments)
             {
                 if (comment.Kind != "more")
                 {
                     <CommentsDisplay CurrentComment="@comment" CommentsLoading="@CommentsLoading"/>
+                    <GoogleTest Client="@Client" VoiceSelectionParams="@VoiceSelectionParams" inputString="@comment.Data.Body"></GoogleTest>
                 }
             }
         }
@@ -84,6 +93,10 @@
 
     [Parameter]
     public string? RedditRedirect { get; set; }
+
+    public TextToSpeechClient Client { get; set; }
+    public VoiceSelectionParams VoiceSelectionParams { get; set; }
+
     private async void DecrementPost()
     {
         if (CurrentPostIndex == 0)
@@ -93,7 +106,7 @@
         if (Posts == null || Posts.Length == 0) return;
         --CurrentPostIndex;
         if (Posts[CurrentPostIndex] == null || Posts[CurrentPostIndex].Data == null || Posts[CurrentPostIndex].Data.Url == null) return;
-        await LoadPost(Posts[CurrentPostIndex].Data.Url);
+        await LoadPost(Posts[CurrentPostIndex].Data.Permalink);
     }
 
     private async void IncrementPost()
@@ -113,7 +126,7 @@
         }
         ++CurrentPostIndex;
         if (Posts[CurrentPostIndex] == null || Posts[CurrentPostIndex].Data == null || Posts[CurrentPostIndex].Data.Url == null) return;
-        await LoadPost(Posts[CurrentPostIndex].Data.Url);
+        await LoadPost(Posts[CurrentPostIndex].Data.Permalink);
     }
 
     private async Task SettingsChanged(SettingsModel settings)
@@ -132,16 +145,18 @@
     {
         SettingsDialogOpen = true;
     }
-    
+
     protected override async Task OnInitializedAsync()
     {
+        Client = await TextToSpeechClient.CreateAsync();
+        VoiceSelectionParams = new VoiceSelectionParams {LanguageCode = "en-US", SsmlGender = SsmlVoiceGender.Male};
         QueryString = _navManager.ToAbsoluteUri(_navManager.Uri).Query;
         if (!string.IsNullOrEmpty(RedditRedirect))
         {
             if (RedditRedirect.Contains("/") && RedditRedirect.Split("/")[1] != null && RedditRedirect.Split("/")[1] == "comments")
             {
                 SettingsModel.SubredditInput = RedditRedirect.Split("/")[0];
-                await LoadPost(_navManager.ToAbsoluteUri(_navManager.Uri));
+                await LoadPost(_navManager.ToAbsoluteUri(_navManager.Uri).AbsolutePath, QueryString);
             }
             else
             {
@@ -154,6 +169,7 @@
             await LoadSubredditPosts();
         }
     }
+
     private async Task LoadSubredditPosts(string after = "", bool newSub = false)
     {
         var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json{QueryString}";
@@ -182,16 +198,16 @@
             {
                 Posts = Posts != null ? Posts.Concat(SubReddit.Data.Posts).ToArray() : SubReddit.Data.Posts;
             }
-            
-            await LoadPost(Posts[CurrentPostIndex].Data.Url);
+
+            await LoadPost(Posts[CurrentPostIndex].Data.Permalink);
             PostLoading = false;
             CommentsLoading = false;
         }
     }
 
-    private async Task LoadPost(Uri uri)
+    private async Task LoadPost(string permalink, string query = "")
     {
-        var url = "https://reddit.com" + uri.AbsolutePath + ".json" + uri.Query;
+        var url = "https://reddit.com" + permalink + ".json" + query;
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         var client = _clientFactory.CreateClient();
 
