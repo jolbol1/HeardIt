@@ -2,11 +2,9 @@
 @page "/r/{*RedditRedirect}"
 @using HeardIt.Models
 @using HeardIt.Components
-@using Google.Cloud.TextToSpeech.V1
 
 @inject IHttpClientFactory _clientFactory
 @inject NavigationManager _navManager
-
 
 
 @if (SettingsDialogOpen)
@@ -20,13 +18,9 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
     </button>
-    
+
     <PostDisplay Post="@MainPost" OpenSettingsDialog="@OpenSettingsDialog" PostLoading="@PostLoading"></PostDisplay>
-    @if (!PostLoading && MainPost != null)
-    {
-        var readString = MainPost.Data.Title + "..." + MainPost.Data.Selftext;
-        <GoogleTest Client="@Client" VoiceSelectionParams="@VoiceSelectionParams" inputString="@readString"></GoogleTest>
-    }
+
 
     <button class="text-gray-600" onclick="@IncrementPost">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -36,7 +30,7 @@
 </div>
 
 
-<div id="comment-display" class="flex flex-row justify-center w-full content-center items-center">
+<div id="comment-display" class="flex flex-row justify-center w-full content-center items-center mb-16">
     <div class="rounded mx-8 overflow-hidden border w-full lg:w-10/12 md:w-10/12 bg-gray-50 shadow-2xl">
         <div class="w-full flex justify-between items-center p-3 bg-gray-500">
             <span class="h-full font-bold text-lg text-white">Comments</span>
@@ -48,7 +42,6 @@
                 if (comment.Kind != "more")
                 {
                     <CommentsDisplay CurrentComment="@comment" CommentsLoading="@CommentsLoading"/>
-                    <GoogleTest Client="@Client" VoiceSelectionParams="@VoiceSelectionParams" inputString="@comment.Data.Body"></GoogleTest>
                 }
             }
         }
@@ -93,9 +86,6 @@
 
     [Parameter]
     public string? RedditRedirect { get; set; }
-
-    public TextToSpeechClient Client { get; set; }
-    public VoiceSelectionParams VoiceSelectionParams { get; set; }
 
     private async void DecrementPost()
     {
@@ -148,8 +138,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Client = await TextToSpeechClient.CreateAsync();
-        VoiceSelectionParams = new VoiceSelectionParams {LanguageCode = "en-US", SsmlGender = SsmlVoiceGender.Male};
         QueryString = _navManager.ToAbsoluteUri(_navManager.Uri).Query;
         if (!string.IsNullOrEmpty(RedditRedirect))
         {
@@ -172,6 +160,14 @@
 
     private async Task LoadSubredditPosts(string after = "", bool newSub = false)
     {
+        if (string.IsNullOrEmpty(QueryString))
+        {
+            QueryString += "?limit=5";
+        }
+        else
+        {
+            QueryString = "&limit=5";
+        }
         var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json{QueryString}";
         if (!string.IsNullOrEmpty(after))
         {
@@ -181,8 +177,6 @@
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         var client = _clientFactory.CreateClient();
 
-        PostLoading = true;
-        CommentsLoading = true;
         HttpResponseMessage responseMessage = await client.SendAsync(request);
 
         if (responseMessage.IsSuccessStatusCode)
@@ -200,13 +194,19 @@
             }
 
             await LoadPost(Posts[CurrentPostIndex].Data.Permalink);
-            PostLoading = false;
-            CommentsLoading = false;
         }
     }
 
     private async Task LoadPost(string permalink, string query = "")
     {
+        if (string.IsNullOrEmpty(query))
+        {
+            query = "?limit=7";
+        }
+        else
+        {
+            query += "&limit=7";
+        }
         var url = "https://reddit.com" + permalink + ".json" + query;
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         var client = _clientFactory.CreateClient();
