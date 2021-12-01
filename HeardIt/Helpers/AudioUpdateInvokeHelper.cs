@@ -12,7 +12,7 @@ namespace HeardIt.Helpers
             this.action = action;
         }
 
-        [JSInvokable("BlazorSample")]
+        [JSInvokable("HeardIt")]
         public void UpdateAudioCaller()
         {
             action.Invoke();

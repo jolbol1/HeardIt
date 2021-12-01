@@ -184,7 +184,7 @@ namespace HeardIt.Models
         [J("depth", NullValueHandling = N.Ignore)]                       public long? Depth { get; set; }                        
         [J("collapsed_because_crowd_control")]                           public object CollapsedBecauseCrowdControl { get; set; }
         [J("count", NullValueHandling = N.Ignore)]                       public long? Count { get; set; }                        
-        [J("children", NullValueHandling = N.Ignore)]                    public string[] Children { get; set; }                  
+        [J("children", NullValueHandling = N.Ignore)]                    public string[] Children { get; set; }
     }
     
 

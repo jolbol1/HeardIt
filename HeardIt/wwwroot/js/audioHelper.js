@@ -17,7 +17,7 @@ window.PlayAudio = (elementName, linkedId) => {
             element.classList.remove("border-opacity-50")
         }
 
-        window.dotnetHelper.invokeMethodAsync('BlazorSample', 'UpdateMessageCaller');
+        window.dotnetHelper.invokeMethodAsync('HeardIt', 'UpdateAudioCaller');
     }
 }
 
@@ -28,4 +28,5 @@ window.updateAudioCaller = (localHelper) => {
 
 window.PauseAudio = (elementName) => {
     document.getElementById(elementName).pause();
+    window.dotnetHelper.dispose();
 }

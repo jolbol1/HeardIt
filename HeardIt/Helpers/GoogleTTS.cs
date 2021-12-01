@@ -24,7 +24,7 @@ namespace HeardIt.Helpers
             {
                 return "";
             }
-            AudioConfig audioConfig = new() {AudioEncoding = AudioEncoding.Mp3};
+            AudioConfig audioConfig = new() {AudioEncoding = AudioEncoding.OggOpus};
             VoiceSelectionParams voiceSelectionParams = new()
             {
                 LanguageCode = "en-US",
@@ -36,7 +36,7 @@ namespace HeardIt.Helpers
             var input = new SynthesisInput {Text = text};
             var response = await _client.SynthesizeSpeechAsync(input, voiceSelectionParams, audioConfig);
             string _base64 = response.AudioContent.ToBase64();
-            return "data:audio/mp3;base64," + _base64;
+            return "data:audio/ogg;base64," + _base64;
         }
         
     }

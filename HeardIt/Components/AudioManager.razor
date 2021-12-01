@@ -1,0 +1,92 @@
+@using HeardIt.Helpers
+@using HeardIt.Models
+@inject IJSRuntime _jsRuntime;
+@inject IGoogleTts _googleTts;
+
+<div id="media-display" class="flex flex-row justify-center w-full content-center items-center mb-16">
+    <button @onclick="AudioPlaying ? PauseSound : PlaySound" class="mx-auto">
+        @if (AudioPlaying)
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+        }
+        else
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+            </svg>
+        }
+    </button>
+    @if (AudioStrings.Count > 0)
+    {
+        <audio id="post-audio" src="@AudioStrings[@CurrentTrack]" type="audio/ogg"></audio>
+    }</div>
+<span class="border-purple-500 border-2 border-opacity-50"></span>
+
+
+@code {
+
+    [Parameter] 
+    public List<Post>? LoadedPosts { get; set; }
+
+    private bool AudioPlaying { get; set; } = false;
+    private AudioUpdateInvokeHelper audioUpdateInvokeHelper;
+    private List<string> AudioStrings { get; set; } = new List<string>();
+    private int CurrentTrack { get; set; } = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        audioUpdateInvokeHelper = new AudioUpdateInvokeHelper(NextTrack);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CurrentTrack = 0;
+        if (LoadedPosts != null && LoadedPosts.Count > 0)
+        {
+            var x = AudioStrings;
+            var baseAudio = await GetBaseAudio(LoadedPosts[0].Data.Title);
+            AudioStrings.Add(baseAudio);
+        }
+    }
+
+    private async Task InteropCall()
+    {
+        await _jsRuntime.InvokeVoidAsync("updateAudioCaller",
+            DotNetObjectReference.Create(audioUpdateInvokeHelper));
+    }
+
+    private async void NextTrack()
+    {
+        CurrentTrack++;
+        var baseAudio = await GetBaseAudio(LoadedPosts[CurrentTrack].Data.Body);
+        AudioStrings.Add(baseAudio);
+        StateHasChanged();
+        await PlaySound();
+    }
+
+    private async Task PlaySound()
+    {
+        if (!AudioPlaying)
+        {
+            await InteropCall();
+        }
+        AudioPlaying = true;
+        await _jsRuntime.InvokeAsync<string>("PlayAudio", "post-audio", LoadedPosts[CurrentTrack].Data.Id);
+    }
+
+    private async Task PauseSound()
+    {
+        AudioPlaying = false;
+        await _jsRuntime.InvokeAsync<string>("PauseAudio", "post-audio");
+    }
+
+    private async Task<string> GetBaseAudio(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return "";
+        return await _googleTts.AudioBase64Tts(input);
+    }
+
+
+}
