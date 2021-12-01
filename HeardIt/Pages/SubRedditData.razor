@@ -2,14 +2,18 @@
 @page "/r/{*RedditRedirect}"
 @using HeardIt.Models
 @using HeardIt.Components
+@using System.Diagnostics
+@using HeardIt.Helpers
 
 @inject IHttpClientFactory _clientFactory
 @inject NavigationManager _navManager
-
+@inject IJSRuntime _jsRuntime;
+@inject IGoogleTts _googleTts;
 
 @if (SettingsDialogOpen)
 {
-    <SettingsModal OnClose="@OnSettingsDialogClose" FormSubmitted="@SettingsChanged" SettingsModel="@SettingsModel"></SettingsModal>
+    <SettingsModal OnClose="@OnSettingsDialogClose" FormSubmitted="@SettingsChanged" SettingsModel="@SettingsModel">
+    </SettingsModal>
 }
 
 <div id="post-display" class="flex flex-row justify-center w-full content-center items-center">
@@ -29,6 +33,23 @@
     </button>
 </div>
 
+
+<div id="media-display" class="flex flex-row justify-center w-full content-center items-center mb-16">
+    <button @onclick="AudioPlaying ? PauseSound : PlaySound" class="mx-auto">
+        @if (AudioPlaying)
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+        }
+        else
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+            </svg>
+        }
+    </button>
+</div>
 
 <div id="comment-display" class="flex flex-row justify-center w-full content-center items-center mb-16">
     <div class="rounded mx-8 overflow-hidden border w-full lg:w-10/12 md:w-10/12 bg-gray-50 shadow-2xl">
@@ -60,9 +81,29 @@
         }
     </div>
 </div>
-
+<audio id="post-audio" src="@BaseAudio"></audio>
+<span class="border-purple-500 border-2 border-opacity-50"></span>
 
 @code {
+    private AudioUpdateInvokeHelper audioUpdateInvokeHelper;
+
+    protected async Task InteropCall()
+    {
+        await _jsRuntime.InvokeVoidAsync("updateAudioCaller",
+            DotNetObjectReference.Create(audioUpdateInvokeHelper));
+    }
+
+    private async void UpdateAudio()
+    {
+        BaseAudio = await _googleTts.AudioBase64Tts(Comments[CurrentTrack].Data.Body);
+        CachedAudios.Add(BaseAudio);
+        StateHasChanged();
+        CurrentTrack++;
+        var x = CachedAudios;
+        await PlaySound();
+    }
+
+    private bool AudioPlaying { get; set; } = false;
     private SettingsModel SettingsModel { get; set; } = new() {SubredditInput = "AskReddit"};
     private Subreddit? SubReddit { get; set; }
     private bool SettingsDialogOpen { get; set; }
@@ -71,7 +112,9 @@
     //Currently Displayed Post
     private Post? MainPost { get; set; }
     //All Comments for Current Post
-    private Post[]? Comments { get; set; }
+    private static Post[]? Comments { get; set; }
+
+    private List<string> CachedAudios { get; set; } = new List<string>();
 
     private Post? CurrentComment { get; set; }
 
@@ -84,8 +127,12 @@
 
     private string? QueryString { get; set; }
 
+    private string? BaseAudio { get; set; }
+    private int CurrentTrack { get; set; } = 0;
+
     [Parameter]
     public string? RedditRedirect { get; set; }
+
 
     private async void DecrementPost()
     {
@@ -138,6 +185,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        audioUpdateInvokeHelper = new AudioUpdateInvokeHelper(UpdateAudio);
         QueryString = _navManager.ToAbsoluteUri(_navManager.Uri).Query;
         if (!string.IsNullOrEmpty(RedditRedirect))
         {
@@ -156,17 +204,30 @@
         {
             await LoadSubredditPosts();
         }
+        await InteropCall();
+    }
+
+    public async Task PlaySound()
+    {
+        AudioPlaying = true;
+        await _jsRuntime.InvokeAsync<string>("PlayAudio", "post-audio", (CurrentTrack == 0) ? MainPost?.Data.Id : Comments?[CurrentTrack -1].Data.Id);
+    }
+
+    public async Task PauseSound()
+    {
+        AudioPlaying = false;
+        await _jsRuntime.InvokeAsync<string>("PauseAudio", "post-audio");
     }
 
     private async Task LoadSubredditPosts(string after = "", bool newSub = false)
     {
-        if (string.IsNullOrEmpty(QueryString))
+        if (!string.IsNullOrEmpty(QueryString))
         {
-            QueryString += "?limit=5";
+            QueryString += "&limit=5";
         }
         else
         {
-            QueryString = "&limit=5";
+            QueryString = "?limit=5";
         }
         var url = $"https://www.reddit.com/r/{SettingsModel.SubredditInput}.json{QueryString}";
         if (!string.IsNullOrEmpty(after))
@@ -185,27 +246,37 @@
             SubReddit = Subreddit.FromJson(jsonString);
             if (newSub)
             {
-                Posts = SubReddit.Data.Posts;
+                Posts = SubReddit.Data.Posts.Where(x => x.Data.Stickied != true).ToArray();
                 CurrentPostIndex = 0;
             }
             else
             {
-                Posts = Posts != null ? Posts.Concat(SubReddit.Data.Posts).ToArray() : SubReddit.Data.Posts;
+                var addPosts = SubReddit.Data.Posts.Where(x => x.Data.Stickied != true).ToArray();
+                Posts = Posts != null ? Posts.Concat(addPosts).ToArray() : addPosts;
             }
 
             await LoadPost(Posts[CurrentPostIndex].Data.Permalink);
         }
     }
 
+    private async void SetBaseAudio(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return;
+        var x = await _googleTts.AudioBase64Tts(input);
+        BaseAudio = x;
+        CachedAudios.Add(x);
+        StateHasChanged();
+    }
+
     private async Task LoadPost(string permalink, string query = "")
     {
         if (string.IsNullOrEmpty(query))
         {
-            query = "?limit=7";
+            query = "?limit=7&depth=0&after=";
         }
         else
         {
-            query += "&limit=7";
+            query += "&limit=7&depth=0&after=";
         }
         var url = "https://reddit.com" + permalink + ".json" + query;
         var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -221,6 +292,8 @@
             var postPages = PostPage.FromJson(jsonString);
             MainPost = postPages[0].Data.Children[0];
             Comments = postPages[1].Data.Children;
+            SetBaseAudio(MainPost.Data.Title);
+            CurrentTrack = 0;
             CurrentComment = Comments[0];
             CurrentCommentIndex = 0;
             PostLoading = false;

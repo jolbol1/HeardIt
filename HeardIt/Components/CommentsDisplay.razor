@@ -1,8 +1,9 @@
 @using HeardIt.Models
+@using HeardIt.Helpers
 @inject IHttpClientFactory _clientFactory
 
 
-<div class="px-5 my-3  mx-5 pb-2 shadow bg-white">
+<div class="px-5 my-3  mx-5 pb-2 shadow bg-white" id="@CurrentComment?.Data.Id">
     <div class="pt-2">
         <div class="mb-2 text-sm text-gray-500 text-justify flex flex-col justify-center">
             <span class="h-full font-bold text-base text-black pb-1">

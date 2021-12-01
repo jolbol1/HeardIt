@@ -1,7 +1,6 @@
 @using HeardIt.Models
 @using HeardIt.Helpers
 
-@inject IGoogleTts _googleTts
 
 <div class="rounded mx-8 my-16 overflow-hidden border w-full lg:w-10/12 md:10-6/12 bg-white shadow-2xl">
     <div class="w-full flex justify-between items-center p-3 bg-gradient-to-r from-indigo-900 to-indigo-600">
@@ -19,7 +18,7 @@
             Subreddit Settings
         </button>
     </div>
-    <div class="px-3 pb-2 shadow-inner">
+    <div class="px-3 pb-2 shadow-inner" id="@Post?.Data.Id">
         <div class="pt-1">
             <div class="my-2 font-bold text-black text-center text-gray-900 flex flex-row justify-center">
                 @if (PostLoading || Post == null)
@@ -45,9 +44,6 @@
                     </div>
                 </div>
             }
-            var readString = Post.Data.Author + " Says... " + Post.Data.Title + "... " + Post.Data.Selftext;
-            var baseAudio = Task.Run(() => _googleTts.AudioBase64Tts(readString)).Result;
-            <audio controls src="@baseAudio" class="mx-auto"></audio>
         }
     </div>
     <div class="px-3 py-1 shadow-inner bg-gray-50">

@@ -39,7 +39,8 @@ namespace HeardIt.Models
 
         [J("id")] public string Id { get; set; }
         [J("url")] public Uri Url { get; set; }
-        [J("permalink", NullValueHandling = N.Ignore)] public string Permalink { get; set; }                   
+        [J("permalink", NullValueHandling = N.Ignore)] public string Permalink { get; set; }    
+        [J("stickied", NullValueHandling = N.Ignore)] public bool? Stickied { get; set; }
 
     }
     
