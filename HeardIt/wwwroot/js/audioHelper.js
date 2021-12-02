@@ -26,7 +26,13 @@ window.updateAudioCaller = (localHelper) => {
 }
 
 
-window.PauseAudio = (elementName) => {
+window.PauseAudio = (elementName, linkedId) => {
     document.getElementById(elementName).pause();
+    if(linkedId) {
+        let element = document.getElementById(linkedId)
+        element.classList.remove("border-purple-500")
+        element.classList.remove("border-2")
+        element.classList.remove("border-opacity-50")
+    }
     window.dotnetHelper.dispose();
 }

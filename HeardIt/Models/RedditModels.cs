@@ -169,7 +169,7 @@ namespace HeardIt.Models
         [J("mod_reports", NullValueHandling = N.Ignore)]                 public object[] ModReports { get; set; }                
         [J("is_video", NullValueHandling = N.Ignore)]                    public bool? IsVideo { get; set; }                      
         [J("comment_type")]                                              public object CommentType { get; set; }                 
-        [J("collapsed_reason_code")]                                     public object CollapsedReasonCode { get; set; }         
+        [J("collapsed_reason_code")]                                     public string CollapsedReasonCode { get; set; }         
         [J("parent_id", NullValueHandling = N.Ignore)]                   public string ParentId { get; set; }                    
         [J("collapsed", NullValueHandling = N.Ignore)]                   public bool? Collapsed { get; set; }                    
         [J("body", NullValueHandling = N.Ignore)]                        public string Body { get; set; }                        
