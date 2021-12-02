@@ -58,6 +58,8 @@
         audioUpdateInvokeHelper = new AudioUpdateInvokeHelper(NextTrack);
     }
 
+
+
     private async void DecrementTrack()
     {
         Rewindable = false;
@@ -74,6 +76,8 @@
     protected override async Task OnParametersSetAsync()
     {
         CurrentTrack = 0;
+        AudioStrings.Clear();
+        AudioPlaying = false;
         if (LoadedPosts is {Count: > 0 })
         {
             var x = AudioStrings;
